@@ -1,8 +1,8 @@
 # Open scratch files in Obsidian
 
 1. In Obsidian's vault picker, choose **Open folder as vault**, then select the same
-   absolute directory used for `OBSIDIAN_AGENT_VAULT`.
-2. Open `Agent Workspace/Home.md`. Browse the `Projects` folder, then open a task's
+   `~/Documents/obsidian-vault` (or the custom directory you configured).
+2. Open `agents/home.md`. Browse the `projects` folder, then open a task's
    `README.md`. Its file links and handoff are the entry points for that task.
 3. Open **Settings → Community plugins**, enable community plugins if necessary,
    then **Browse** and search for **Code Files** (by Lukas Bach). Install and enable it.

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'plugins/obsidian-workspace/scripts/vault.py'
 spec = importlib.util.spec_from_file_location('vault', SCRIPT)
@@ -22,7 +23,7 @@ class VaultTests(unittest.TestCase):
 
     def test_init_preserves_existing_notes(self):
         vault.init(self.root)
-        note = self.root / 'Agent Workspace/Home.md'
+        note = self.root / 'agents/home.md'
         note.write_text('Human edits', encoding='utf-8')
         vault.init(self.root)
         self.assertEqual(note.read_text(), 'Human edits')
@@ -31,6 +32,8 @@ class VaultTests(unittest.TestCase):
         result = vault.task(self.root, 'billing-api', 'Fix "retry": error', 'codex')
         base = Path(result['task_dir'])
         self.assertTrue(base.is_relative_to(self.root))
+        self.assertTrue(all(' ' not in part for part in base.relative_to(self.root).parts))
+        self.assertEqual(base.relative_to(self.root).parts[:3], ('agents', 'projects', 'billing-api'))
         self.assertTrue((base / 'handoffs/latest.md').is_file())
         for folder in ('scratch', 'tmp', 'research', 'artifacts', 'logs'):
             self.assertTrue((base / folder).is_dir())
@@ -54,23 +57,32 @@ class VaultTests(unittest.TestCase):
         self.root.mkdir()
         outside = Path(self.temp.name) / 'outside'
         outside.mkdir()
-        (self.root / 'Agent Workspace').symlink_to(outside, target_is_directory=True)
+        (self.root / 'agents').symlink_to(outside, target_is_directory=True)
         with self.assertRaises(ValueError):
             vault.init(self.root)
         self.assertEqual(list(outside.iterdir()), [])
 
     def test_cli_and_hook_context(self):
         env = {key: value for key, value in os.environ.items() if key != 'OBSIDIAN_AGENT_VAULT'}
-        missing = subprocess.run([sys.executable, str(SCRIPT), 'init'], env=env, capture_output=True, text=True)
-        self.assertNotEqual(missing.returncode, 0)
         context = subprocess.run([sys.executable, str(SCRIPT), 'context'], env=env, capture_output=True, text=True, check=True)
-        self.assertIn('Vault is not configured', context.stdout)
+        self.assertIn(str(Path.home() / 'Documents/obsidian-vault'), context.stdout)
         env['OBSIDIAN_AGENT_VAULT'] = str(self.root)
         created = subprocess.run([sys.executable, str(SCRIPT), 'task', '--project', 'demo', '--title', 'CLI smoke'], env=env, capture_output=True, text=True, check=True)
         self.assertTrue(Path(json.loads(created.stdout)['index']).is_file())
         context = subprocess.run([sys.executable, str(SCRIPT), 'context'], env=env, capture_output=True, text=True, check=True)
         self.assertIn(str(self.root), context.stdout)
         self.assertIn('handoffs/', context.stdout)
+
+    def test_default_vault_and_override_precedence(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(Path, 'home', return_value=Path(self.temp.name)):
+            expected = Path(self.temp.name) / 'Documents/obsidian-vault'
+            self.assertEqual(vault.vault_root(), expected.resolve())
+            vault.init(vault.vault_root())
+            self.assertTrue((expected / 'agents/home.md').is_file())
+            with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT': str(self.root)}):
+                self.assertEqual(vault.vault_root(), self.root.resolve())
+                explicit = Path(self.temp.name) / 'explicit'
+                self.assertEqual(vault.vault_root(str(explicit)), explicit.resolve())
 
     def test_relative_vault_rejected(self):
         with self.assertRaises(ValueError):

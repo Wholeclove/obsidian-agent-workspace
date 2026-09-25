@@ -1,18 +1,21 @@
 {
   "name": "obsidian-workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Keep agent working files and handoffs in a navigable Obsidian vault.",
   "author": {
-    "name": "Whole Clove"
+    "name": "Whole Clove LLC"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Obsidian Workspace",
     "shortDescription": "Scratch files and handoffs in your Obsidian vault.",
     "longDescription": "Organize temporary notes, scripts, logs, research, and handoffs by project and task with human-readable indexes.",
-    "developerName": "Whole Clove",
+    "developerName": "Whole Clove LLC",
     "category": "Productivity",
     "capabilities": [],
     "defaultPrompt": "Use my Obsidian vault for working files and handoffs."
-  }
+  },
+  "license": "MIT",
+  "repository": "https://github.com/Wholeclove/obsidian-agent-workspace",
+  "homepage": "https://github.com/Wholeclove/obsidian-agent-workspace#readme"
 }

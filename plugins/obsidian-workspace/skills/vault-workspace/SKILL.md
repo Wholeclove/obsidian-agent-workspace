@@ -5,7 +5,7 @@ description: Organize agent-created temporary files, scratch notes, research, lo
 
 Read [the vault structure and working policy](references/vault-structure.md) before writing working files. The vault is a normal filesystem directory; no Obsidian API, server, or running desktop app is needed.
 
-Resolve the vault from the user's explicit path or `OBSIDIAN_AGENT_VAULT`. If neither exists, ask for the path; do not invent a location. Ensure the agent has write access under its normal permissions. Use the helper at `../../scripts/vault.py` relative to this skill folder (resolve to an absolute path before invoking from another directory):
+Resolve the vault in order: the user's explicit path, `OBSIDIAN_AGENT_VAULT`, then `~/Documents/obsidian-vault`. Expand `~` to the user's home directory. The helper uses the same default when `--vault` and the environment variable are omitted. Ensure the agent has write access under its normal permissions. Use the helper at `../../scripts/vault.py` relative to this skill folder (resolve to an absolute path before invoking from another directory):
 
 ```sh
 python3 /absolute/plugin/scripts/vault.py --vault "/absolute/vault" init

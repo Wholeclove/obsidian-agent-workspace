@@ -8,15 +8,18 @@ from pathlib import Path
 import re
 import sys
 import uuid
+from urllib.parse import quote
 
 PLUGIN = Path(__file__).resolve().parents[1]
 POLICY = PLUGIN / 'skills/vault-workspace/references/vault-structure.md'
 
 
 def vault_root(explicit=None):
-    value = explicit or os.environ.get('OBSIDIAN_AGENT_VAULT')
-    if not value:
-        raise ValueError('Set OBSIDIAN_AGENT_VAULT to an absolute vault path or pass --vault PATH.')
+    value = (
+        explicit
+        or os.environ.get('OBSIDIAN_AGENT_VAULT')
+        or Path.home() / 'Documents/obsidian-vault'
+    )
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError('Vault path must be absolute.')
@@ -42,10 +45,10 @@ def safe_dir(root, relative):
 
 def init(root):
     root.mkdir(parents=True, exist_ok=True)
-    agent = safe_dir(root, 'Agent Workspace')
-    safe_dir(root, 'Agent Workspace/Projects')
-    create_once(agent / 'Home.md', '# Agent Workspace\n\nStart here. Open [[Agent Workspace/Guide|the vault guide]], then browse `Projects/`.\nEach project has an index; each task has a README and handoff.\n\nNo automatic cleanup: completed tasks stay at stable paths.\n')
-    create_once(agent / 'Guide.md', POLICY.read_text(encoding='utf-8'))
+    agent = safe_dir(root, 'agents')
+    safe_dir(root, 'agents/projects')
+    create_once(agent / 'home.md', '# Agent workspace\n\nStart here. Open [[agents/guide|the vault guide]], then browse `projects/`.\nEach project has an index; each task has a README and handoff.\n\nNo automatic cleanup: completed tasks stay at stable paths.\n')
+    create_once(agent / 'guide.md', POLICY.read_text(encoding='utf-8'))
     return agent
 
 
@@ -56,11 +59,11 @@ def task(root, project, title, owner):
     if not slug:
         raise ValueError('Task title needs at least one ASCII letter or digit.')
     init(root)
-    project_dir = safe_dir(root, f'Agent Workspace/Projects/{project}')
-    create_once(project_dir / 'Index.md', f'# {project}\n\nBrowse `Tasks/`; task names start with a UTC timestamp.\n\n```query\npath:"Agent Workspace/Projects/{project}/Tasks" file:README\n```\n')
+    project_dir = safe_dir(root, f'agents/projects/{project}')
+    create_once(project_dir / 'index.md', f'# {project}\n\nBrowse `tasks/`; task names start with a UTC timestamp.\n\n```query\npath:"agents/projects/{project}/tasks" file:README\n```\n')
     now = dt.datetime.now(dt.timezone.utc)
     task_id = f'{now:%Y%m%dT%H%M%SZ}-{slug}-{uuid.uuid4().hex[:8]}'
-    base = safe_dir(root, f'Agent Workspace/Projects/{project}/Tasks/{task_id}')
+    base = safe_dir(root, f'agents/projects/{project}/tasks/{task_id}')
     for folder in ('scratch', 'tmp', 'research', 'artifacts', 'logs', 'handoffs'):
         safe_dir(root, str(base.relative_to(root) / folder))
     metadata = '\n'.join(f'{key}: {json.dumps(value)}' for key, value in {
@@ -70,7 +73,6 @@ def task(root, project, title, owner):
     create_once(base / 'README.md', f'---\n{metadata}\n---\n\n# Task\n\n## Objective\n\nDescribe the requested outcome.\n\n## Working context\n\nRecord repository, worktree, branch, issue URL, and relevant constraints.\n\n## Current state\n\nTask created; update this before pausing.\n\n## Files\n\n- [Latest handoff](handoffs/latest.md) — continuation context.\n- `scratch/` — working notes and experiments.\n- `tmp/` — disposable intermediates.\n- `research/` — findings and source links.\n- `artifacts/` — reviewable outputs and attachments.\n- `logs/` — captured command output.\n\nAdd a relative Markdown link and one-line purpose for every file worth finding again.\n')
     create_once(base / 'handoffs/latest.md', '# Handoff\n\n[Task index](../README.md)\n\n## Goal and state\n\n## Decisions and constraints\n\n## Files and evidence\n\n## Next actions\n\n## Blockers\n\n## Verification\n\nRecord commands, results, and remaining uncertainty.\n')
     relative = base.relative_to(root).as_posix()
-    from urllib.parse import quote
     return {'task_dir': str(base), 'index': str(base / 'README.md'),
             'vault_relative_index': relative + '/README.md',
             'obsidian_uri': 'obsidian://open?path=' + quote(str(base / 'README.md'), safe=''),
@@ -79,9 +81,12 @@ def task(root, project, title, owner):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--vault', help='Absolute vault root; defaults to OBSIDIAN_AGENT_VAULT')
+    parser.add_argument(
+        '--vault',
+        help='Absolute vault root; defaults to OBSIDIAN_AGENT_VAULT or ~/Documents/obsidian-vault',
+    )
     sub = parser.add_subparsers(dest='command', required=True)
-    sub.add_parser('init', help='Add the Agent Workspace folder without replacing existing notes')
+    sub.add_parser('init', help='Add the agents folder without replacing existing notes')
     new = sub.add_parser('task', help='Create a unique task with index and handoff')
     new.add_argument('--project', required=True)
     new.add_argument('--title', required=True)

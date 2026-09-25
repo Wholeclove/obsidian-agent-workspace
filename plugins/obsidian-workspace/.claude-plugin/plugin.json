@@ -1,6 +1,11 @@
 {
   "name": "obsidian-workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Keep agent working files and handoffs in a navigable Obsidian vault.",
-  "author": {"name": "Whole Clove"}
+  "author": {
+    "name": "Whole Clove LLC"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/Wholeclove/obsidian-agent-workspace",
+  "homepage": "https://github.com/Wholeclove/obsidian-agent-workspace#readme"
 }

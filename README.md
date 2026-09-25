@@ -1,130 +1,143 @@
 # Obsidian Agent Workspace
 
-Claude Code and Codex plugins that put agent-created scratch files, temporary scripts,
-research, logs, artifacts, and handoffs in an Obsidian vault. Both clients use the same
-skill, helper, and directory conventions. Python 3.9+ is the only helper dependency.
+[![Tests](https://github.com/Wholeclove/obsidian-agent-workspace/actions/workflows/tests.yml/badge.svg)](https://github.com/Wholeclove/obsidian-agent-workspace/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Start with a vault
+Keep Claude Code and Codex working files in an Obsidian vault: scratch notes,
+temporary scripts, research, logs, and handoffs, organized by project and task.
 
-Use an existing vault or choose a new directory. From this repository:
+Each task has a readable index and a handoff note. You can inspect the work in
+Obsidian, or give another agent the task index to continue from the same context.
+Both clients share one skill and a dependency-free Python helper.
 
-```sh
-export OBSIDIAN_AGENT_VAULT="$HOME/Documents/Agent Vault"
-python3 plugins/obsidian-workspace/scripts/vault.py init
-python3 plugins/obsidian-workspace/scripts/vault.py task \
-  --project my-project --title "Investigate a bug" --owner human
-```
+## Requirements
 
-`init` creates a starter workspace under `Agent Workspace/` and preserves existing
-notes. Open the chosen directory as a vault in Obsidian and start at
-`Agent Workspace/Home.md`. The task command returns JSON with paths and an Obsidian
-URI. Use a task's README and handoff to resume it; don't create another task on each turn.
+- Python 3.10 or later, available as `python3`.
+- Claude Code or Codex with plugin support. For Codex CLI, check that
+  `codex plugin marketplace add --help` is available.
+- A local directory for the vault, writable by your agent.
+- Obsidian is optional for agents and useful for browsing the files yourself.
 
-Set `OBSIDIAN_AGENT_VAULT` in the environment that launches your agent, or put the
-absolute vault path in the persistent instruction below. Desktop apps may not inherit
-shell startup files. The helper also accepts `--vault "/absolute/path"` **before** its
-subcommand. No hidden config or guessed default vault is used.
+Examples use a POSIX shell on macOS or Linux. These platforms are covered by CI;
+Windows client integration has not been verified.
 
-## Install for Claude Code
+## Install
 
-From Claude Code, replace the path below with this checkout's absolute path:
+**Claude Code** — run inside a session:
 
 ```text
-/plugin marketplace add /absolute/path/to/obsidian-agent-workspace
+/plugin marketplace add Wholeclove/obsidian-agent-workspace
 /plugin install obsidian-workspace@obsidian-agent-workspace
 ```
 
-Start a new session. For a one-session local development load:
+**Codex** — run in your terminal:
 
 ```sh
-claude --plugin-dir /absolute/path/to/obsidian-agent-workspace/plugins/obsidian-workspace
+codex plugin marketplace add https://github.com/Wholeclove/obsidian-agent-workspace.git
+codex plugin add obsidian-workspace@obsidian-agent-workspace
 ```
 
-The plugin's `SessionStart` hook prints the vault policy on startup, resume, and
-compaction. The `/obsidian-workspace:vault-workspace` skill provides the same workflow.
-The hook is read-only and never creates folders or edits client settings.
+Start a new session or thread after installation. Invoke
+`/obsidian-workspace:vault-workspace` in Claude Code or `$vault-workspace` in Codex.
+No manual clone is needed to install either plugin.
 
-## Install for Codex
+## First task
 
-This repository contains a local Codex marketplace named `personal`, generated with
-the Codex plugin scaffold. Add this checkout and install the plugin:
+Ask your agent:
 
-```sh
-codex plugin marketplace add /absolute/path/to/obsidian-agent-workspace
-codex plugin add obsidian-workspace@personal
-```
+> Use the vault-workspace skill to initialize my vault and create a task for
+> billing-api called Investigate retry failures.
 
-If you already have a marketplace named `personal`, give this repository's
-`.agents/plugins/marketplace.json` a unique top-level `name` before adding it, and use
-that name after `@`. This changes only this repository's catalog, not your existing
-marketplace. Start a new Codex thread after installation; invoke `$vault-workspace`
-if needed. The package uses the `.codex-plugin/plugin.json` format supported by the
-locally validated Codex CLI. Codex and Claude have separate marketplace manifests;
-the actual plugin content is shared.
-
-## Make it the default for every task
-
-Skills are selected on demand. For the requested always-use-the-vault behavior,
-append the following block to your existing global `~/.codex/AGENTS.md` and
-`~/.claude/CLAUDE.md`, or to the corresponding instructions in each project. Replace
-the example vault path. Preserve all existing instructions.
-
-```markdown
-## Agent working files
-
-Use the obsidian-workspace plugin's vault-workspace skill before creating any
-agent-controlled temporary file, scratch note/script, research file, captured log,
-artifact, or handoff. My vault is `/absolute/path/to/Agent Vault`.
-Read `Agent Workspace/Guide.md` in that vault. Keep these files under
-`Agent Workspace/Projects/<project>/Tasks/<task-id>/`, following its structure.
-Reuse the current task; keep its README file links and handoffs/latest.md current.
-Return an absolute link and vault-relative path to the task README when handing off.
-Keep deliverable source code and required project files in their repository.
-If the vault is inaccessible, report the issue instead of silently writing elsewhere.
-```
-
-Grant vault write access through each client's normal workspace/sandbox controls.
-For Codex CLI, `codex --add-dir "$OBSIDIAN_AGENT_VAULT"` adds that directory to the
-writable workspace. The plugin does not change permissions. No credentials, server,
-or running Obsidian app are required for filesystem access.
-
-This provides model instructions and scoped temp-directory guidance, **not OS-level
-enforcement**. Tool-internal caches, agent transcripts, and mandatory build outputs
-can still live elsewhere. Actual project changes remain in the appropriate Git
-worktree. See [the full policy](plugins/obsidian-workspace/skills/vault-workspace/references/vault-structure.md).
-
-## Find files as a human
+The default vault is **`~/Documents/obsidian-vault`**. The helper creates its
+workspace when invoked; installing the plugin does not write to the vault.
+Open that directory as a vault in Obsidian and start at `agents/home.md`.
 
 ```text
-Agent Workspace/Home.md
-  Projects/<project>/Index.md
-    Tasks/<timestamp>-<title>-<id>/README.md
-      scratch/  tmp/  research/  artifacts/  logs/  handoffs/latest.md
+obsidian-vault/
+└── agents/
+    ├── home.md
+    ├── guide.md
+    └── projects/
+        └── billing-api/
+            ├── index.md
+            └── tasks/
+                └── 20260925T160000Z-investigate-retry-failures-a1b2c3d4/
+                    ├── README.md
+                    ├── scratch/
+                    ├── tmp/
+                    ├── research/
+                    ├── artifacts/
+                    ├── logs/
+                    └── handoffs/latest.md
 ```
 
-The README links to useful files and records status, owner, timestamps, repository,
-worktree, and branch. Handoffs record what happened and what to do next. Completed
-tasks stay at stable paths, marked complete or archived. Nothing is auto-deleted.
+The task README links to relevant files and records the objective, status, owner,
+and working context. The handoff captures decisions, verification, and next steps.
+Resume a task from its README instead of creating a new folder for each session.
+Completed tasks stay at stable paths; nothing is automatically deleted.
 
-Follow [Obsidian setup](docs/obsidian-setup.md) to open and edit non-default file types.
-Use [the walkthrough](docs/walkthrough.md) to verify the workflow after installing.
+See [Obsidian setup](docs/obsidian-setup.md) for opening code, JSON, logs, and other
+non-default file types, and [the walkthrough](docs/walkthrough.md) for a complete
+cross-client check.
 
-## Development
+## Configuration
+
+Vault selection follows this order:
+
+1. An explicit vault path supplied to the agent or the helper's `--vault` option.
+2. The `OBSIDIAN_AGENT_VAULT` environment variable.
+3. `~/Documents/obsidian-vault`.
+
+For an existing vault:
 
 ```sh
-python3 -m unittest discover -s tests -v
-claude plugin validate ./plugins/obsidian-workspace
+export OBSIDIAN_AGENT_VAULT="$HOME/Documents/my-vault"
 ```
 
-The tests use isolated directories and never alter your real vault or client config.
-This repository does not install plugins globally or modify your existing vault by
-itself. Install and configure it using the steps above.
+Desktop applications may not inherit your shell environment. Put the path in your
+agent's persistent instructions when needed. Generated folder names have no spaces;
+custom vault paths containing spaces are supported.
 
-## References
+Grant the vault write access using your client's workspace controls. For Codex CLI,
+create the vault directory first, then launch with:
 
-- [Claude plugin manifests](https://code.claude.com/docs/en/plugins-reference)
-- [Claude startup hook behavior](https://code.claude.com/docs/en/hooks#sessionstart)
-- [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
-- [Codex persistent instructions](https://developers.openai.com/codex/guides/agents-md)
+```sh
+codex --add-dir "${OBSIDIAN_AGENT_VAULT:-$HOME/Documents/obsidian-vault}"
+```
 
-Installation commands were also checked against the locally installed CLI help.
+## Use for every task
+
+Claude's startup hook loads the workspace policy; Codex selects the skill on demand.
+To make the workflow a persistent preference, append this block to
+`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, or your project's instructions. Adjust
+the vault path and preserve the file's existing content.
+
+```markdown
+## Working files
+
+Use the obsidian-workspace plugin's vault-workspace skill for agent-created
+scratch files, temporary scripts, research, logs, artifacts, and handoffs.
+My vault is ~/Documents/obsidian-vault. Expand ~ to my home directory.
+Initialize it if needed, then follow agents/guide.md.
+Reuse the current task and keep its README links and handoffs/latest.md current.
+At handoff, provide the task README's absolute link and vault-relative path.
+Keep deliverable source code and required project files in the repository.
+If the vault is inaccessible, report the issue before writing working files.
+```
+
+## Scope
+
+The plugin guides agent behavior; it does not intercept filesystem writes.
+Tool-managed caches, transcripts, and required build outputs may remain elsewhere.
+Agent-controlled working files belong in the vault, while source changes belong in
+their repository. The helper does not change permissions, configure sync, or install
+Obsidian community plugins. Avoid putting credentials or unredacted secrets in a
+vault, particularly one that syncs to other devices.
+
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for local development and checks, [CLI usage](docs/cli.md) for the helper, and
+[CHANGELOG.md](CHANGELOG.md) for changes and upgrade notes.
+
+Licensed under the [MIT License](LICENSE).

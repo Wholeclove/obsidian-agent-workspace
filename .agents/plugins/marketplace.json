@@ -1,7 +1,7 @@
 {
-  "name": "personal",
+  "name": "obsidian-agent-workspace",
   "interface": {
-    "displayName": "Personal"
+    "displayName": "Obsidian Agent Workspace"
   },
   "plugins": [
     {
