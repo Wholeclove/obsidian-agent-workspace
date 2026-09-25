@@ -1,7 +1,8 @@
 # Verify an installation
 
 1. Initialize a test vault using [the helper](cli.md) with an explicit test path. Open its home note in Obsidian.
-2. Install one client plugin and apply the persistent instruction block. Use the default vault or set the vault
+2. Add [the guidance](agent-guidance.md) to one client's persistent instructions.
+   The plugin is optional. Use the default vault or set the vault
    environment variable or an explicit path for a custom vault. Start a fresh session.
 3. Ask: “Investigate a small problem. Put a scratch Python script, a JSON result, and a
    handoff in my vault, using project `workspace-smoke`. Give me the task index link.”
@@ -23,5 +24,6 @@ New generated paths under the vault must not contain spaces. Custom vault paths
 containing spaces must still work.
 
 A manual model session is needed to evaluate instruction following. Automated tests
-cover the helper and hook output; they do not prove that every future agent action
-will comply. Hooks and skills do not intercept arbitrary filesystem writes.
+cover the helper and its context output; they do not prove that every future agent action
+will comply. The guidance does not intercept filesystem writes. No hooks run at startup or
+before writes.

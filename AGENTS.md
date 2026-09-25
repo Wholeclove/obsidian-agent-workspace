@@ -1,8 +1,10 @@
 # Repository development
 
 Work in a dedicated task worktree. This repository packages one shared plugin for
-Claude Code and Codex; keep both manifests at the same version. Shared instructions
-live in `plugins/obsidian-workspace/skills/vault-workspace/`. Avoid copying the policy
+Claude Code and Codex; keep both manifests at the same version. Standalone guidance
+lives in `docs/agent-guidance.md`; keep it usable without a plugin. The detailed
+vault policy and optional skill live in
+`plugins/obsidian-workspace/skills/vault-workspace/`. Avoid copying the policy
 into client-specific skill files.
 
 Run `python3 -m unittest discover -s tests -v` after changing the helper. Never use a

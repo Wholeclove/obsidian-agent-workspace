@@ -1,7 +1,9 @@
 ---
 name: vault-workspace
-description: Organize agent-created temporary files, scratch notes, research, logs, artifacts, and handoffs in an Obsidian vault. Use before creating working files or resuming work from a vault handoff.
+description: Initialize an Obsidian agent workspace, create task folders with the bundled helper, or review its layout. Optional companion to persistent vault guidance in AGENTS.md or CLAUDE.md.
 ---
+
+Persistent client guidance establishes the working-file convention; this skill is an optional setup and reference tool. It installs no hooks.
 
 Read [the vault structure and working policy](references/vault-structure.md) before writing working files. The vault is a normal filesystem directory; no Obsidian API, server, or running desktop app is needed.
 

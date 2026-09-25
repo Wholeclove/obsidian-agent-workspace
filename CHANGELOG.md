@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+- Make standalone `AGENTS.md` / `CLAUDE.md` guidance the primary setup.
+- Keep the plugin skill and workspace helper optional.
+- Remove the Claude session-start hook; no background or per-write checks run.
+
+### Upgrading from 0.2.0
+
+Add the guidance from `docs/agent-guidance.md` to your client instructions. Refresh
+or reinstall the plugin and start a new session to stop loading the old startup
+hook. The repository does not edit your global client settings. Existing vaults
+and task paths are unchanged.
+
 ## 0.2.0
 
 - Install both clients directly from the public GitHub repository.

@@ -55,6 +55,6 @@ The command must support these variables. Redirections and explicit output paths
 still need to point into the task directory. No environment is changed globally.
 
 Filesystem or input errors produce a message on stderr and a nonzero exit code.
-For an invalid vault setting, `context` prints a diagnostic for the model so the
-startup hook can still explain the configuration problem. It never selects a
+For an invalid vault setting, `context` prints a diagnostic for the model to
+explain the configuration problem. It never selects a
 fallback in place of an invalid explicit path.

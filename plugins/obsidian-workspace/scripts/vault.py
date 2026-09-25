@@ -91,7 +91,7 @@ def main():
     new.add_argument('--project', required=True)
     new.add_argument('--title', required=True)
     new.add_argument('--owner', default='unassigned')
-    sub.add_parser('context', help='Print startup instructions; does not write files')
+    sub.add_parser('context', help='Print the vault path and working policy; does not write files')
     args = parser.parse_args()
     if args.command == 'context':
         try:

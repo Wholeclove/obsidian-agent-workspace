@@ -29,10 +29,11 @@ Linux and macOS with Python 3.10 and 3.13.
 | `plugins/obsidian-workspace/` | Self-contained plugin for both clients |
 | `plugins/obsidian-workspace/skills/vault-workspace/` | Shared skill and vault policy |
 | `plugins/obsidian-workspace/scripts/vault.py` | Workspace initialization and task creation |
-| `plugins/obsidian-workspace/hooks/hooks.json` | Claude session-start context hook |
+| `docs/agent-guidance.md` | Standalone persistent instructions for both clients |
 | `tests/` | Helper behavior and package integration tests |
 
-Keep the policy in the shared skill. Client-specific manifests should identify the
+Keep the standalone guidance usable without a plugin. Keep its conventions aligned
+with the detailed policy in the shared skill. Client-specific manifests should identify the
 same plugin version. The plugin's copy of `LICENSE` travels with installed packages
 and must match the root license.
 
@@ -52,7 +53,7 @@ already installed the GitHub marketplace with that name. Start a fresh thread af
 changing the installed skill.
 
 Follow [the walkthrough](docs/walkthrough.md) for behavior that requires an actual
-agent or Obsidian. Automated tests verify file operations and startup context;
+agent or Obsidian. Automated tests verify file operations and helper context output;
 they cannot establish that a model follows every instruction or that the Obsidian
 UI works. Report which checks you ran and which you could not run in your PR.
 

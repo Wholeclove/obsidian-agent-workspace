@@ -62,7 +62,7 @@ class VaultTests(unittest.TestCase):
             vault.init(self.root)
         self.assertEqual(list(outside.iterdir()), [])
 
-    def test_cli_and_hook_context(self):
+    def test_cli_and_context(self):
         env = {key: value for key, value in os.environ.items() if key != 'OBSIDIAN_AGENT_VAULT'}
         context = subprocess.run([sys.executable, str(SCRIPT), 'context'], env=env, capture_output=True, text=True, check=True)
         self.assertIn(str(Path.home() / 'Documents/obsidian-vault'), context.stdout)

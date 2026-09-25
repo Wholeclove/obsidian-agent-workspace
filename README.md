@@ -8,20 +8,43 @@ temporary scripts, research, logs, and handoffs, organized by project and task.
 
 Each task has a readable index and a handoff note. You can inspect the work in
 Obsidian, or give another agent the task index to continue from the same context.
-Both clients share one skill and a dependency-free Python helper.
+Persistent guidance establishes the workflow in both clients. An optional plugin
+and dependency-free Python helper create the workspace and task folders.
 
 ## Requirements
 
-- Python 3.10 or later, available as `python3`.
-- Claude Code or Codex with plugin support. For Codex CLI, check that
-  `codex plugin marketplace add --help` is available.
+- Claude Code or Codex with access to your filesystem.
+- Python 3.10 or later for the optional helper, available as `python3`.
+- Plugin support only if you choose to install the optional plugin.
 - A local directory for the vault, writable by your agent.
 - Obsidian is optional for agents and useful for browsing the files yourself.
 
 Examples use a POSIX shell on macOS or Linux. These platforms are covered by CI;
 Windows client integration has not been verified.
 
-## Install
+## Add the guidance
+
+Copy [the agent guidance](docs/agent-guidance.md) into your existing instruction
+file, preserving its other content:
+
+| Client | All projects | One project |
+| --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` | `CLAUDE.md` at the project root |
+| Codex | `~/.codex/AGENTS.md` | `AGENTS.md` at the project root |
+
+Set a custom vault path in those instructions if needed, then start a new session.
+The guidance covers destinations, navigation, updates, and handoffs directly; it
+requires no skill invocation. It asks the agent to check file destinations as it
+works. There are no startup hooks or per-write checks running in the background.
+
+Installing the optional plugin does **not** install these persistent instructions.
+The guidance is usable on its own; an agent can create the documented layout with
+its normal filesystem tools.
+
+## Optional plugin
+
+The plugin supplies the `vault-workspace` skill and helper for initializing a vault
+and creating task folders. Install directly from GitHub:
 
 **Claude Code** — run inside a session:
 
@@ -45,11 +68,11 @@ No manual clone is needed to install either plugin.
 
 Ask your agent:
 
-> Use the vault-workspace skill to initialize my vault and create a task for
-> billing-api called Investigate retry failures.
+> Follow my vault guidance and create a task for billing-api called Investigate
+> retry failures. Use the workspace helper if available.
 
-The default vault is **`~/Documents/obsidian-vault`**. The helper creates its
-workspace when invoked; installing the plugin does not write to the vault.
+The default vault is **`~/Documents/obsidian-vault`**. The agent or helper creates
+the workspace when asked; installing the plugin does not write to the vault.
 Open that directory as a vault in Obsidian and start at `agents/home.md`.
 
 ```text
@@ -105,29 +128,9 @@ create the vault directory first, then launch with:
 codex --add-dir "${OBSIDIAN_AGENT_VAULT:-$HOME/Documents/obsidian-vault}"
 ```
 
-## Use for every task
-
-Claude's startup hook loads the workspace policy; Codex selects the skill on demand.
-To make the workflow a persistent preference, append this block to
-`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, or your project's instructions. Adjust
-the vault path and preserve the file's existing content.
-
-```markdown
-## Working files
-
-Use the obsidian-workspace plugin's vault-workspace skill for agent-created
-scratch files, temporary scripts, research, logs, artifacts, and handoffs.
-My vault is ~/Documents/obsidian-vault. Expand ~ to my home directory.
-Initialize it if needed, then follow agents/guide.md.
-Reuse the current task and keep its README links and handoffs/latest.md current.
-At handoff, provide the task README's absolute link and vault-relative path.
-Keep deliverable source code and required project files in the repository.
-If the vault is inaccessible, report the issue before writing working files.
-```
-
 ## Scope
 
-The plugin guides agent behavior; it does not intercept filesystem writes.
+The guidance directs agent behavior; it does not intercept filesystem writes.
 Tool-managed caches, transcripts, and required build outputs may remain elsewhere.
 Agent-controlled working files belong in the vault, while source changes belong in
 their repository. The helper does not change permissions, configure sync, or install
