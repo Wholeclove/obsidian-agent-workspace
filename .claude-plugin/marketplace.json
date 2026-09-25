@@ -1,0 +1,15 @@
+{
+  "name": "obsidian-agent-workspace",
+  "owner": {
+    "name": "Whole Clove"
+  },
+  "plugins": [
+    {
+      "name": "obsidian-workspace",
+      "source": "./plugins/obsidian-workspace"
+    }
+  ],
+  "metadata": {
+    "description": "Shared Obsidian working files and handoffs for Claude Code and Codex."
+  }
+}
