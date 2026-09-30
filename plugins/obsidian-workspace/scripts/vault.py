@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 from urllib.parse import quote
 
@@ -14,12 +15,62 @@ PLUGIN = Path(__file__).resolve().parents[1]
 POLICY = PLUGIN / 'skills/vault-workspace/references/vault-structure.md'
 
 
-def vault_root(explicit=None):
-    value = (
-        explicit
-        or os.environ.get('OBSIDIAN_AGENT_VAULT')
-        or Path.home() / 'Documents/obsidian-vault'
-    )
+def git(cwd, *args):
+    # Resolve the session's repository, even when a parent command exported Git paths.
+    env = {key: value for key, value in os.environ.items()
+           if key not in {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE'}}
+    try:
+        return subprocess.run(['git', '-C', str(cwd), *args], env=env,
+                              capture_output=True, text=True, timeout=5)
+    except FileNotFoundError as exc:
+        raise ValueError('Git is required for repository scope; select --scope global or --vault.') from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError('Git repository discovery timed out.') from exc
+
+
+def repository_root(cwd=None):
+    """Return the primary checkout, including for linked worktrees and submodules."""
+    cwd = Path(cwd or Path.cwd()).resolve()
+    inside = git(cwd, 'rev-parse', '--is-inside-work-tree')
+    if inside.returncode or inside.stdout.strip() != 'true':
+        raise ValueError('No working Git repository here; select --scope global or an absolute --vault.')
+    git_dir = git(cwd, 'rev-parse', '--absolute-git-dir')
+    common_dir = git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+    if git_dir.returncode or common_dir.returncode:
+        raise ValueError('Cannot discover Git metadata; select an explicit vault.')
+    if git_dir.stdout.strip() == common_dir.stdout.strip():
+        top = git(cwd, 'rev-parse', '--show-toplevel')
+        if top.returncode:
+            raise ValueError('Cannot discover repository root; select an explicit vault.')
+        return Path(top.stdout.strip()).resolve()
+    result = git(cwd, 'worktree', 'list', '--porcelain', '-z')
+    if result.returncode:
+        raise ValueError('Cannot discover the primary checkout: ' + result.stderr.strip())
+    fields = result.stdout.split('\0\0', 1)[0].split('\0')
+    if not fields[0].startswith('worktree ') or 'bare' in fields:
+        raise ValueError('Repository has no primary checkout; select --scope global or --vault.')
+    root = Path(fields[0][len('worktree '):])
+    if not root.is_dir() or not (root / '.git').exists():
+        raise ValueError('Primary checkout cannot be located; restore it or select an explicit vault.')
+    return root.resolve()
+
+
+def vault_root(explicit=None, scope=None, cwd=None):
+    value = explicit or os.environ.get('OBSIDIAN_AGENT_VAULT')
+    if not value:
+        scope = scope or os.environ.get('OBSIDIAN_AGENT_VAULT_SCOPE')
+        if scope is None:
+            config = git(cwd or Path.cwd(), 'config', '--local', '--get', 'obsidianWorkspace.scope')
+            if config.returncode not in (0, 1):
+                raise ValueError('Cannot read repository vault scope; select --scope global or --vault. '
+                                 + config.stderr.strip())
+            scope = config.stdout.strip() if config.returncode == 0 else 'repository'
+        if scope not in ('repository', 'global'):
+            raise ValueError('Vault scope must be repository or global.')
+        if scope == 'global':
+            value = Path.home() / 'Documents/obsidian-vault'
+        else:
+            value = repository_root(cwd) / '.agent-vault'
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError('Vault path must be absolute.')
@@ -45,6 +96,15 @@ def safe_dir(root, relative):
 
 def init(root):
     root.mkdir(parents=True, exist_ok=True)
+    # An ignore file inside the default vault keeps scratch files out of Git
+    # without editing the repository's tracked .gitignore or Git configuration.
+    if root.name == '.agent-vault':
+        try:
+            is_repository_vault = root.parent.resolve() == repository_root(root.parent)
+        except ValueError:
+            is_repository_vault = False
+        if is_repository_vault:
+            create_once(root / '.gitignore', '*\n')
     agent = safe_dir(root, 'agents')
     safe_dir(root, 'agents/projects')
     create_once(agent / 'home.md', '# Agent workspace\n\nStart here. Open [[agents/guide|the vault guide]], then browse `projects/`.\nEach project has an index; each task has a README and handoff.\n\nNo automatic cleanup: completed tasks stay at stable paths.\n')
@@ -117,12 +177,25 @@ No decisions recorded yet.
             'tmpdir': str(base / 'tmp')}
 
 
+def context(explicit=None, scope=None, cwd=None):
+    try:
+        location = f'Configured vault root: {vault_root(explicit, scope, cwd)}'
+    except (ValueError, OSError) as exc:
+        location = f'Vault is not configured: {exc} Resolve this before writing working files.'
+    return (f'{location}\nWorkspace helper: {Path(__file__).resolve()}\n'
+            'For continuation, use the existing task README and its vault even if the default changed.\n'
+            'An explicit user destination takes precedence. Verify access from the agent session; '
+            'hook execution does not grant vault access.\n\n' + POLICY.read_text(encoding='utf-8'))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         '--vault',
-        help='Absolute vault root; defaults to OBSIDIAN_AGENT_VAULT or ~/Documents/obsidian-vault',
+        help='Absolute vault root; overrides OBSIDIAN_AGENT_VAULT and scope selection',
     )
+    parser.add_argument('--scope', choices=('repository', 'global'),
+                        help='Default: repository; global uses ~/Documents/obsidian-vault')
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('init', help='Add the agents folder without replacing existing notes')
     new = sub.add_parser('task', help='Create a unique task with index and handoff')
@@ -130,19 +203,15 @@ def main():
     new.add_argument('--title', required=True)
     new.add_argument('--owner', default='unassigned')
     sub.add_parser('context', help='Print the vault path and working policy; does not write files')
+    sub.add_parser('path', help='Print only the resolved vault path; does not write files')
     args = parser.parse_args()
     if args.command == 'context':
-        try:
-            root = vault_root(args.vault)
-            location = f'Configured vault root: {root}'
-        except ValueError as exc:
-            location = f'Vault is not configured: {exc} Ask the user for its path before writing temporary files.'
-        print(location)
-        print(f'Workspace helper: {Path(__file__).resolve()}')
-        print(POLICY.read_text(encoding='utf-8'))
+        print(context(args.vault, args.scope))
         return
-    root = vault_root(args.vault)
-    if args.command == 'init':
+    root = vault_root(args.vault, args.scope)
+    if args.command == 'path':
+        print(root)
+    elif args.command == 'init':
         print(init(root))
     else:
         print(json.dumps(task(root, args.project, args.title, args.owner), indent=2))

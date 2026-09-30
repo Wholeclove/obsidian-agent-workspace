@@ -69,6 +69,59 @@ class PackageTests(unittest.TestCase):
                 with self.subTest(document=path.relative_to(REPO), target=target):
                     self.assertTrue((path.parent / target.split('#')[0]).exists())
 
+    def test_installed_hooks_use_event_cwd_and_do_not_write(self):
+        with tempfile.TemporaryDirectory(prefix='plugin-hooks-test-') as temp:
+            root = Path(temp).resolve()
+            installed = root / 'plugin cache' / PLUGIN.name
+            shutil.copytree(PLUGIN, installed, ignore=shutil.ignore_patterns('__pycache__'))
+            repo = root / 'project with spaces'
+            env = {k: v for k, v in os.environ.items()
+                   if not k.startswith(('OBSIDIAN_AGENT_', 'GIT_'))}
+            env.update(CLAUDE_PLUGIN_ROOT=str(installed),
+                       GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+            subprocess.run(['git', 'init', str(repo)], env=env, capture_output=True, check=True)
+            before = set(root.rglob('*'))
+            hooks = json.loads((installed / 'hooks/hooks.json').read_text())['hooks']
+            self.assertEqual(set(hooks), {'SessionStart', 'SubagentStart'})
+            for name, source in [('SessionStart', s) for s in ('startup', 'resume', 'clear', 'compact')] + [('SubagentStart', None)]:
+                with self.subTest(event=name, source=source):
+                    group = hooks[name][0]
+                    self.assertNotIn('matcher', group)  # All start sources and agent types.
+                    command = group['hooks'][0]['command']
+                    result = subprocess.run(command, shell=True, cwd=root, env=env,
+                                            input=json.dumps({'hook_event_name': name, 'cwd': str(repo),
+                                                              'source': source, 'agent_type': 'test'}),
+                                            capture_output=True, text=True, check=True)
+                    output = json.loads(result.stdout)['hookSpecificOutput']
+                    self.assertEqual(output['hookEventName'], name)
+                    context = output['additionalContext']
+                    policy = installed / 'skills/vault-workspace/references/vault-structure.md'
+                    self.assertIn(policy.read_text(), context)
+                    self.assertIn(str(repo / '.agent-vault'), context)
+                    self.assertIn(str(installed / 'scripts/vault.py'), context)
+                    self.assertLess(len(context), 10000)  # Avoid Claude's large-context file indirection.
+            self.assertEqual(set(root.rglob('*')), before)
+
+    def test_hook_configuration_errors_and_bad_events(self):
+        with tempfile.TemporaryDirectory(prefix='hook-errors-test-') as temp:
+            root = Path(temp).resolve()
+            command = ['python3', str(PLUGIN / 'scripts/session_context.py')]
+            env = dict(os.environ, OBSIDIAN_AGENT_VAULT='relative/path')
+            result = subprocess.run(command, cwd=root, env=env,
+                                    input=json.dumps({'hook_event_name': 'SessionStart', 'cwd': str(root)}),
+                                    capture_output=True, text=True, check=True)
+            context = json.loads(result.stdout)['hookSpecificOutput']['additionalContext']
+            self.assertIn('Vault is not configured:', context)
+            self.assertIn('must be absolute', context)
+            for payload in ('not json', '[]', '{}', '{"hook_event_name":"Stop"}',
+                            '{"hook_event_name":"SessionStart","cwd":"relative"}'):
+                result = subprocess.run(command, cwd=root, env=env, input=payload,
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, '')
+                self.assertIn('obsidian-workspace:', result.stderr)
+            self.assertEqual(list(root.iterdir()), [])
+
 
 if __name__ == '__main__':
     unittest.main()

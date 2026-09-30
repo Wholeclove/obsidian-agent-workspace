@@ -12,19 +12,23 @@ available after a worktree is removed and gives other agents a stable entry poin
 | Root [CLAUDE.md](../CLAUDE.md) | Directs Claude Code to the same repository instructions |
 | [Standalone guidance](agent-guidance.md) | Complete working-file defaults; can be copied into global or project instructions without installing a plugin |
 | [Shared vault policy](../plugins/obsidian-workspace/skills/vault-workspace/references/vault-structure.md) | Detailed layout, task lifecycle, navigation, and retention rules shipped in the plugin |
+| [Plugin hooks](../plugins/obsidian-workspace/hooks/hooks.json) | Load the bundled policy at session and subagent start, including session resume and compaction |
 | [Optional skill](../plugins/obsidian-workspace/skills/vault-workspace/SKILL.md) | Reads the shared policy and explains how to run the helper |
 | [Helper](../plugins/obsidian-workspace/scripts/vault.py) | Creates the folders and notes; `context` prints the resolved vault and shared policy |
 | `<vault>/agents/guide.md` | Policy copied by the helper on first initialization; existing content is preserved |
 
-Installing the plugin alone does not install persistent instructions or grant
-vault access. Repository instructions travel with commits into new worktrees;
+Enabled, trusted plugin hooks load the guidance automatically; no copied instruction
+file is required. Installation does not grant vault filesystem access. Repository instructions travel with commits into new worktrees;
 existing worktrees on older commits still have their previous instructions.
 Client-specific instruction paths and access settings are in [README](../README.md).
 
 ## Defaults
 
-Resolve the vault from an explicit user path or helper `--vault`, then
-`OBSIDIAN_AGENT_VAULT`, then `~/Documents/obsidian-vault`. Each task lives at:
+Explicit user paths or helper `--vault` override `OBSIDIAN_AGENT_VAULT`; otherwise
+the default is `.agent-vault/` in the primary Git checkout, shared by its worktrees.
+Scope can be changed to `global` for `~/Documents/obsidian-vault`; see
+[configuration](../README.md#configuration). Existing tasks keep their original vault.
+Each task lives at:
 
 ```text
 <vault>/agents/projects/<project>/tasks/<number>-<task>-<YYYY-MM-DD>/
@@ -82,15 +86,15 @@ and link existing decision notes while preserving them.
    Report missing access instead of silently changing the destination.
 
 The helper records placeholders for working context; the agent must fill them in.
-It does not detect a repository, choose a worktree location, or update client settings.
+It detects the primary checkout to resolve a repository vault, but does not choose
+a worktree location or update client settings.
 
 ## Existing installations
 
-Refresh installed persistent guidance when adopting these conventions. Review an
+Update the plugin and review its hooks, or refresh standalone copied guidance. Review an
 existing `agents/guide.md` and merge changes while preserving human edits; rerunning
 `init` will not update it. Existing task folders and links stay where they are.
 
 Tool-managed plans, transcripts, caches, and required build outputs may remain in
 their own storage. Put a current copy of a client-managed plan in `scratch/plan.md`
-when needed for handoff. No startup hook, per-write enforcement, migration, or
-cleanup job runs automatically.
+when needed for handoff. Startup hooks load guidance; no per-write enforcement, migration, or cleanup job runs.

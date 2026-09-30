@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Load shared guidance automatically through SessionStart and SubagentStart hooks
+  for Claude Code and Codex. Codex users must review and trust the hooks.
+- Default new tasks to an ignored `.agent-vault/` in the primary checkout, shared
+  across worktrees. Add repository/global scope settings and a read-only `path` command.
+- Keep explicit vault overrides and existing task locations. Outside Git, select
+  global scope or an explicit vault. No notes or client settings are migrated.
+- Separate plugin and standalone installation; document vault permissions and
+  verification from both primary checkouts and linked worktrees.
+
+### Upgrading from 0.4.0 or earlier
+
+Update the plugin, review its hooks in Codex with `/hooks`, then start a new session.
+Once automatic guidance loading is verified, remove only the old copied vault
+policy from client instructions; preserve unrelated rules and explicit vault choices.
+To keep the former shared default, set `OBSIDIAN_AGENT_VAULT_SCOPE=global` or
+`git config --local obsidianWorkspace.scope global` in each repository.
+Explicit `OBSIDIAN_AGENT_VAULT` paths continue to take precedence. Existing vault
+guides are preserved; merge desired policy changes explicitly. Reopen old tasks
+using their existing README paths.
+
+### Earlier unreleased changes
+
 - Add a task-level `decisions.md` with a decision template, README/handoff links,
   and an absolute path in helper output. Agents add a missing log when resuming
   older tasks, preserving existing decision notes.

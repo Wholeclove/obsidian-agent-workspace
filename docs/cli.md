@@ -6,6 +6,7 @@ helper relative to the plugin, so agents do not need a separate checkout.
 
 ```sh
 python3 plugins/obsidian-workspace/scripts/vault.py --help
+python3 plugins/obsidian-workspace/scripts/vault.py path
 python3 plugins/obsidian-workspace/scripts/vault.py init
 python3 plugins/obsidian-workspace/scripts/vault.py task \
   --project billing-api --title "Investigate retry failures" --owner codex
@@ -16,6 +17,7 @@ python3 plugins/obsidian-workspace/scripts/vault.py context
 | --- | --- |
 | `init` | Creates `agents/home.md`, `agents/guide.md`, and `agents/projects/`; prints the workspace path. Existing notes are preserved. |
 | `task` | Creates a unique task, subfolders, README, decision log, and handoff; prints JSON paths. Also initializes the workspace if needed. |
+| `path` | Prints only the absolute vault path; does not write files. Useful for access settings. |
 | `context` | Prints the resolved vault path, helper path, and policy. Does not write files. |
 
 Select a custom vault by passing `--vault` **before** the command:
@@ -26,9 +28,25 @@ python3 plugins/obsidian-workspace/scripts/vault.py \
   --project billing-api --title "Investigate retry failures" --owner claude
 ```
 
-An explicit path takes precedence over `OBSIDIAN_AGENT_VAULT`, which takes
-precedence over `~/Documents/obsidian-vault`. Paths must be absolute after expanding
-`~`. Quote paths and titles in shell commands.
+Explicit `--vault` overrides `OBSIDIAN_AGENT_VAULT`; either overrides scope.
+Otherwise scope is `--scope`, `OBSIDIAN_AGENT_VAULT_SCOPE`, repository-local
+`obsidianWorkspace.scope`, then `repository`. The repository default is
+`.agent-vault/` in the primary checkout, shared across linked worktrees. `global`
+uses `~/Documents/obsidian-vault`:
+
+```sh
+python3 plugins/obsidian-workspace/scripts/vault.py --scope global context
+git config --local obsidianWorkspace.scope global
+```
+
+Run the installed helper from the repository you are working on; its installation
+directory does not select the vault. Outside Git, use global scope or `--vault`.
+Bare-primary worktrees and layouts where Git cannot locate the primary checkout
+also require an explicit choice. Paths must be absolute after expanding `~`.
+Quote paths and titles in shell commands. `init` and `task` add an internal
+`.gitignore` containing `*` to the default repository vault when absent; existing
+notes and ignore files remain unchanged. `path` and `context` are read-only.
+See [vault access](../README.md#give-repository-agents-vault-access) before writes.
 
 Projects use lowercase ASCII letters, digits, and hyphens. Choose a stable project
 slug across worktrees, and distinguish repositories with the same basename. Task

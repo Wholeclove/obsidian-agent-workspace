@@ -1,9 +1,12 @@
 # Verify an installation
 
 1. Initialize a test vault using [the helper](cli.md) with an explicit test path. Open its home note in Obsidian.
-2. Add [the guidance](agent-guidance.md) to one client's persistent instructions.
-   The plugin is optional. Use the default vault or set the vault
-   environment variable or an explicit path for a custom vault. Start a fresh session.
+2. Install and enable the plugin in one client; in Codex, review and trust it with
+   `/hooks`. Alternatively, add [standalone guidance](agent-guidance.md) to client
+   instructions. Grant access to the test vault as described in the README, set
+   `OBSIDIAN_AGENT_VAULT` to that explicit test path, and start a fresh session.
+   Do not use a real vault or overwrite existing client settings during testing.
+   For the plugin path, confirm guidance loads without invoking its skill.
 3. Ask: “Investigate a small problem. Put a scratch Python script, a JSON result, and a
    handoff in my vault, using project `workspace-smoke`. Give me the task index link.”
 4. Confirm all three files are inside one task folder, have descriptive filenames,
@@ -24,14 +27,34 @@
    links its replacement, and links the log from the README and handoff.
 8. Mark the task complete. Confirm no automatic cleanup moves or deletes its files.
 
-Run `python3 plugins/obsidian-workspace/scripts/vault.py context` without a vault
-override: it must report `~/Documents/obsidian-vault` expanded to your home directory
-without writing files. Set `OBSIDIAN_AGENT_VAULT` to a test path and confirm it wins
-over the default; pass `--vault` before `context` to override the environment too.
-New generated paths under the vault must not contain spaces. Custom vault paths
-containing spaces must still work.
+## Check defaults and worktrees
 
-A manual model session is needed to evaluate instruction following. Automated tests
-cover the helper and its context output; they do not prove that every future agent action
-will comply. The guidance does not intercept filesystem writes. No hooks run at startup or
-before writes.
+In an isolated Git repository, with path and scope overrides unset, run the
+installed helper’s `path` and `context` commands. Both must report
+`<primary-checkout>/.agent-vault` without writing files. Repeat from a linked
+worktree and a nested directory; all must resolve the same vault. Create a task
+and confirm that Git ignores its notes, then resume it from the other checkout.
+
+Set `git config --local obsidianWorkspace.scope global` and confirm both checkouts
+resolve `~/Documents/obsidian-vault` (expanded). Use `--scope repository` to
+override it for one helper command. Set `OBSIDIAN_AGENT_VAULT` to a test path and
+confirm it wins over scope; pass `--vault` to override that environment path.
+Outside Git, an unset scope must produce a diagnostic; `--scope global` or an
+explicit path must work. Invalid paths/settings must not silently select a fallback.
+Generated path components have no spaces; custom vault paths with spaces work.
+
+## Check automatic guidance
+
+Use a test client profile without copied vault policy. Start and resume a session,
+then compact it; check that the session receives the bundled policy and correct
+vault path each time. Ask a subagent to report its working-file conventions and
+confirm the SubagentStart hook supplies the same policy. Check both clients.
+Hook commands must not create files or read private vault notes at startup.
+Test a linked worktree with access to the primary vault, and verify the actual
+agent can read and write there under its normal sandbox/permission settings.
+
+A manual model session is needed to evaluate instruction following. Automated
+tests cover resolution, file operations, and packaged hook events; they do not
+prove that every future agent action will comply. Startup hooks load guidance;
+there are no per-write checks. See the task’s verification report for checks
+actually run and any live-client checks still pending.

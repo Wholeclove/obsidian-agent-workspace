@@ -28,6 +28,8 @@ Linux and macOS with Python 3.10 and 3.13.
 | `.claude-plugin/marketplace.json` | Claude Code marketplace catalog |
 | `plugins/obsidian-workspace/` | Self-contained plugin for both clients |
 | `plugins/obsidian-workspace/skills/vault-workspace/` | Shared skill and vault policy |
+| `plugins/obsidian-workspace/hooks/hooks.json` | Shared session and subagent startup hooks |
+| `plugins/obsidian-workspace/scripts/session_context.py` | Read-only hook context adapter |
 | `plugins/obsidian-workspace/scripts/vault.py` | Workspace initialization and task creation |
 | `docs/agent-guidance.md` | Standalone persistent instructions for both clients |
 | `tests/` | Helper behavior and package integration tests |
@@ -53,7 +55,7 @@ already installed the GitHub marketplace with that name. Start a fresh thread af
 changing the installed skill.
 
 Follow [the walkthrough](docs/walkthrough.md) for behavior that requires an actual
-agent or Obsidian. Automated tests verify file operations and helper context output;
+agent or Obsidian. Automated tests verify file operations, repository/worktree resolution, and packaged hook output;
 they cannot establish that a model follows every instruction or that the Obsidian
 UI works. Report which checks you ran and which you could not run in your PR.
 

@@ -141,7 +141,7 @@ class VaultTests(unittest.TestCase):
 
     def test_cli_and_context(self):
         env = {key: value for key, value in os.environ.items() if key != 'OBSIDIAN_AGENT_VAULT'}
-        context = subprocess.run([sys.executable, str(SCRIPT), 'context'], env=env, capture_output=True, text=True, check=True)
+        context = subprocess.run([sys.executable, str(SCRIPT), '--scope', 'global', 'context'], env=env, capture_output=True, text=True, check=True)
         self.assertIn(str(Path.home() / 'Documents/obsidian-vault'), context.stdout)
         env['OBSIDIAN_AGENT_VAULT'] = str(self.root)
         created = subprocess.run([sys.executable, str(SCRIPT), 'task', '--project', 'demo', '--title', 'CLI smoke'], env=env, capture_output=True, text=True, check=True)
@@ -153,8 +153,8 @@ class VaultTests(unittest.TestCase):
     def test_default_vault_and_override_precedence(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(Path, 'home', return_value=Path(self.temp.name)):
             expected = Path(self.temp.name) / 'Documents/obsidian-vault'
-            self.assertEqual(vault.vault_root(), expected.resolve())
-            vault.init(vault.vault_root())
+            self.assertEqual(vault.vault_root(scope='global'), expected.resolve())
+            vault.init(vault.vault_root(scope='global'))
             self.assertTrue((expected / 'agents/home.md').is_file())
             with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT': str(self.root)}):
                 self.assertEqual(vault.vault_root(), self.root.resolve())
@@ -164,6 +164,141 @@ class VaultTests(unittest.TestCase):
     def test_relative_vault_rejected(self):
         with self.assertRaises(ValueError):
             vault.vault_root('relative/path')
+
+
+class RepositoryVaultTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='repository-vault-test-')
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name).resolve()
+        self.repo = self.base / 'repository with spaces'
+        self.repo.mkdir()
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith(('OBSIDIAN_AGENT_', 'GIT_'))}
+        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        self.env = patch.dict(os.environ, env, clear=True)
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.git('init')
+        self.git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                 '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'Initial')
+
+    def git(self, *args):
+        return subprocess.run(['git', '-C', str(self.repo), *args],
+                              capture_output=True, text=True, check=True)
+
+    def worktree(self):
+        path = self.base / 'task worktree'
+        self.git('worktree', 'add', '-b', 'task-test', str(path))
+        return path
+
+    def test_default_shared_across_worktrees_and_nested_directories(self):
+        worktree = self.worktree()
+        nested = worktree / 'nested'
+        nested.mkdir()
+        expected = self.repo / '.agent-vault'
+        for cwd in (self.repo, worktree, nested):
+            self.assertEqual(vault.vault_root(cwd=cwd), expected)
+        self.assertFalse(expected.exists())
+
+    def test_scope_settings_and_override_precedence(self):
+        worktree = self.worktree()
+        self.git('config', '--local', 'obsidianWorkspace.scope', 'global')
+        with patch.object(Path, 'home', return_value=self.base):
+            global_root = self.base / 'Documents/obsidian-vault'
+            self.assertEqual(vault.vault_root(cwd=worktree), global_root)
+            self.assertEqual(vault.vault_root(scope='repository', cwd=worktree), self.repo / '.agent-vault')
+            with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT_SCOPE': 'repository'}):
+                self.assertEqual(vault.vault_root(cwd=worktree), self.repo / '.agent-vault')
+                self.assertEqual(vault.vault_root(scope='global', cwd=worktree), global_root)
+            with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT': str(self.base / 'custom')}):
+                self.assertEqual(vault.vault_root(scope='repository', cwd=worktree), self.base / 'custom')
+                self.assertEqual(vault.vault_root(str(self.base / 'explicit'), cwd=worktree), self.base / 'explicit')
+
+    def test_invalid_settings_never_fall_back(self):
+        self.git('config', '--local', 'obsidianWorkspace.scope', 'typo')
+        with self.assertRaises(ValueError):
+            vault.vault_root(cwd=self.repo)
+        with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT_SCOPE': 'typo'}):
+            with self.assertRaises(ValueError):
+                vault.vault_root(cwd=self.repo)
+        with patch.dict(os.environ, {'OBSIDIAN_AGENT_VAULT': '../escape'}):
+            with self.assertRaises(ValueError):
+                vault.vault_root(cwd=self.repo)
+        self.assertFalse((self.repo / '.agent-vault').exists())
+
+    def test_outside_git_requires_explicit_choice(self):
+        with self.assertRaises(ValueError):
+            vault.vault_root(cwd=self.base)
+        self.assertEqual(vault.vault_root(str(self.base / 'custom'), cwd=self.base), self.base / 'custom')
+        with patch.object(Path, 'home', return_value=self.base):
+            self.assertEqual(vault.vault_root(scope='global', cwd=self.base), self.base / 'Documents/obsidian-vault')
+        self.assertIn('Vault is not configured:', vault.context(cwd=self.base))
+
+    def test_repository_vault_is_ignored_and_existing_ignore_is_preserved(self):
+        root = vault.vault_root(cwd=self.repo)
+        vault.task(root, 'demo', 'Ignored task', 'test')
+        self.assertEqual(self.git('status', '--porcelain', '--untracked-files=all').stdout, '')
+        ignore = root / '.gitignore'
+        ignore.write_text('*\n# human note\n')
+        vault.init(root)
+        self.assertEqual(ignore.read_text(), '*\n# human note\n')
+
+    def test_explicit_vault_does_not_receive_ignore_file(self):
+        root = self.base / 'explicit'
+        vault.init(root)
+        self.assertFalse((root / '.gitignore').exists())
+
+    def test_git_environment_cannot_redirect_repository_discovery(self):
+        other = self.base / 'other'
+        subprocess.run(['git', 'init', str(other)], check=True, capture_output=True)
+        with patch.dict(os.environ, {'GIT_DIR': str(other / '.git'), 'GIT_WORK_TREE': str(other)}):
+            self.assertEqual(vault.vault_root(cwd=self.repo), self.repo / '.agent-vault')
+
+    def test_separate_git_directory(self):
+        other = self.base / 'separate'
+        subprocess.run(['git', 'init', '--separate-git-dir', str(self.base / 'metadata'), str(other)],
+                       check=True, capture_output=True)
+        self.assertEqual(vault.vault_root(cwd=other), other / '.agent-vault')
+
+    def test_submodule_uses_its_own_checkout(self):
+        source = self.base / 'submodule source'
+        subprocess.run(['git', 'clone', str(self.repo), str(source)], check=True, capture_output=True)
+        self.git('-c', 'protocol.file.allow=always', 'submodule', 'add', str(source), 'module')
+        module = self.repo / 'module'
+        self.assertEqual(vault.vault_root(cwd=module), module / '.agent-vault')
+
+    def test_unlocatable_primary_with_separate_git_dir_requires_explicit_vault(self):
+        other = self.base / 'separate'
+        subprocess.run(['git', 'clone', '--separate-git-dir', str(self.base / 'metadata'),
+                        str(self.repo), str(other)], check=True, capture_output=True)
+        linked = self.base / 'separate linked'
+        subprocess.run(['git', '-C', str(other), 'worktree', 'add', '-b', 'separate-test', str(linked)],
+                       check=True, capture_output=True)
+        # Git's first worktree entry points at metadata for this layout, not the checkout.
+        with self.assertRaisesRegex(ValueError, 'Primary checkout cannot be located'):
+            vault.vault_root(cwd=linked)
+        self.assertEqual(vault.vault_root(str(other / '.agent-vault'), cwd=linked), other / '.agent-vault')
+
+    def test_bare_primary_does_not_choose_a_linked_worktree_vault(self):
+        bare = self.base / 'bare.git'
+        subprocess.run(['git', 'clone', '--bare', str(self.repo), str(bare)], check=True, capture_output=True)
+        linked = self.base / 'bare worktree'
+        subprocess.run(['git', '-C', str(bare), 'worktree', 'add', '-b', 'linked-test', str(linked)], check=True, capture_output=True)
+        with self.assertRaisesRegex(ValueError, 'no primary checkout'):
+            vault.vault_root(cwd=linked)
+        subprocess.run(['git', '-C', str(linked), 'config', '--local', 'obsidianWorkspace.scope', 'global'],
+                       check=True, capture_output=True)
+        with patch.object(Path, 'home', return_value=self.base):
+            self.assertEqual(vault.vault_root(cwd=linked), self.base / 'Documents/obsidian-vault')
+
+    def test_path_command_is_read_only_and_matches_context(self):
+        worktree = self.worktree()
+        path = subprocess.run([sys.executable, str(SCRIPT), 'path'], cwd=worktree,
+                              capture_output=True, text=True, check=True).stdout.strip()
+        self.assertEqual(path, str(self.repo / '.agent-vault'))
+        self.assertIn(path, vault.context(cwd=worktree))
+        self.assertFalse(Path(path).exists())
 
 
 if __name__ == '__main__':

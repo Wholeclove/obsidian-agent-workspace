@@ -5,10 +5,22 @@ research, intermediate data, captured logs, review artifacts, and handoffs.
 Keep deliverable source code, tests, and required project configuration in the
 repository's task worktree. Honor explicit user destinations.
 
-Resolve the vault from an explicit user path, then `OBSIDIAN_AGENT_VAULT`, then
-`~/Documents/obsidian-vault`. Expand `~` to the user's home directory. Use ordinary
-filesystem tools; Obsidian does not need to be running. If the vault is inaccessible,
-report the issue instead of silently using `/tmp` or a repository scratch directory.
+Resolve the vault from an explicit user path, then `OBSIDIAN_AGENT_VAULT`.
+Otherwise, scope defaults to `repository`: use `.agent-vault/` in the primary Git
+checkout, shared by all linked worktrees. Find that checkout from the first entry
+of `git worktree list --porcelain` (do not assume the current worktree is primary).
+The helper’s `path` command handles this discovery, including paths with spaces.
+Scope selection is helper `--scope`, then `OBSIDIAN_AGENT_VAULT_SCOPE`, then the
+repository's local Git setting `obsidianWorkspace.scope`, then `repository`.
+The `global` scope uses `~/Documents/obsidian-vault`. Outside Git or with a bare
+primary repository, require an explicit vault or global scope. Report invalid
+settings instead of falling back. Expand `~` to the user's home directory.
+Continue existing tasks at their current vault paths; do not migrate them when
+configuration changes. When creating a repository vault without the helper, add
+`*` to its own `.gitignore`, preserving existing content, to keep notes out of Git.
+Use ordinary filesystem tools; Obsidian does not need to be running. If the vault
+is inaccessible, report the issue instead of silently using `/tmp` or a repository
+scratch directory. A worktree may need explicit access to the primary vault.
 
 Before creating working files, choose or resume a task under:
 
@@ -108,4 +120,4 @@ absolute link to the task README and its vault-relative path.
 Keep completed tasks at stable paths and mark them complete or archived. Do not
 move or delete files automatically. Existing tasks under an older layout should
 remain at their original paths. Check your own file destinations as you work;
-there is no hook or filesystem enforcement for this convention.
+startup hooks can load guidance, but no hook enforces individual filesystem writes.
