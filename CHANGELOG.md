@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- Add a task-level `decisions.md` with a decision template, README/handoff links,
+  and an absolute path in helper output. Agents add a missing log when resuming
+  older tasks, preserving existing decision notes.
+
+- Shorten new task paths to `tasks/number-title-YYYY-MM-DD/`; retain full UTC timestamps
+  in metadata and allocate project sequence numbers safely for concurrent agents.
+- Existing task folders are preserved. Old and new naming formats may appear in
+  separate groups when sorted together; resume older tasks at their original paths.
+  Refresh installed guidance and merge the new naming rule into existing vault guides.
+
+- Document default destinations for plans, worktree notes, scripts, and reports.
+- Connect repository agent instructions to the shared working-file guidance.
+- Document persistent vault access for both clients and continuation across worktrees.
+- Refresh installed guidance and merge updates into existing vault guides explicitly;
+  `init` preserves those guides.
+
 ## 0.3.0
 
 - Make standalone `AGENTS.md` / `CLAUDE.md` guidance the primary setup.

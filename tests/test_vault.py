@@ -1,8 +1,10 @@
 import concurrent.futures
+import datetime as dt
 import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -35,6 +37,15 @@ class VaultTests(unittest.TestCase):
         self.assertTrue(all(' ' not in part for part in base.relative_to(self.root).parts))
         self.assertEqual(base.relative_to(self.root).parts[:3], ('agents', 'projects', 'billing-api'))
         self.assertTrue((base / 'handoffs/latest.md').is_file())
+        self.assertEqual(Path(result['decisions']), base / 'decisions.md')
+        self.assertTrue(Path(result['decisions']).is_file())
+        for note in [base / 'README.md', base / 'decisions.md', base / 'handoffs/latest.md']:
+            links = re.findall(r'\]\(([^)]+)\)', note.read_text())
+            self.assertTrue(links)
+            for target in links:
+                self.assertTrue((note.parent / target).is_file(), (note, target))
+        for note in [base / 'README.md', base / 'handoffs/latest.md']:
+            self.assertIn('decisions.md)', note.read_text())
         for folder in ('scratch', 'tmp', 'research', 'artifacts', 'logs'):
             self.assertTrue((base / folder).is_dir())
         self.assertIn('Fix \\"retry\\": error', (base / 'README.md').read_text())
@@ -46,6 +57,72 @@ class VaultTests(unittest.TestCase):
             results = list(pool.map(lambda _: vault.task(self.root, 'app', 'Same task', 'claude'), range(8)))
         self.assertEqual(len({item['task_dir'] for item in results}), 8)
         self.assertTrue(all(Path(item['index']).is_file() for item in results))
+
+    def test_short_names_sort_by_day_and_creation_order(self):
+        times = [dt.datetime(2026, 9, 29, 23, 59, tzinfo=dt.timezone.utc),
+                 dt.datetime(2026, 9, 29, 23, 59, 30, tzinfo=dt.timezone.utc),
+                 dt.datetime(2026, 9, 30, 0, 0, tzinfo=dt.timezone.utc)]
+        with patch.object(vault.dt, 'datetime') as clock:
+            clock.now.side_effect = times
+            results = [vault.task(self.root, 'app', title, 'codex')
+                       for title in ['Zebra investigation', 'Alpha report', 'Next day']]
+        paths = [Path(item['task_dir']).relative_to(self.root / 'agents/projects/app/tasks').as_posix()
+                 for item in results]
+        self.assertEqual(paths, ['1-zebra-investigation-2026-09-29',
+                                 '2-alpha-report-2026-09-29',
+                                 '3-next-day-2026-09-30'])
+        self.assertEqual(sorted(paths, key=lambda name: int(name.split('-')[0])), paths)
+        for result, created in zip(results, times):
+            self.assertIn(created.isoformat(), Path(result['index']).read_text())
+
+    def test_parallel_different_titles_receive_distinct_order_numbers(self):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(lambda n: vault.task(self.root, 'app', f'Task {n}', 'codex'), range(12)))
+        numbers = sorted(int(Path(item['task_dir']).name.split('-')[0]) for item in results)
+        self.assertEqual(numbers, list(range(1, 13)))
+
+    def test_sequence_sorts_across_999_and_preserves_old_tasks(self):
+        tasks = self.root / 'agents/projects/app/tasks'
+        old = tasks / '20260928T120000Z-old-task-abcdef12'
+        old.mkdir(parents=True)
+        note = old / 'README.md'
+        note.write_text('Existing task and human edits')
+        (tasks / '0999-earlier-task-2026-09-28').mkdir()
+        now = dt.datetime(2026, 9, 29, tzinfo=dt.timezone.utc)
+        with patch.object(vault.dt, 'datetime') as clock:
+            clock.now.return_value = now
+            result = vault.task(self.root, 'app', 'Next task', 'codex')
+        self.assertEqual(Path(result['task_dir']).name, '1000-next-task-2026-09-29')
+        self.assertLess(999, int(Path(result['task_dir']).name.split('-')[0]))
+        self.assertEqual(note.read_text(), 'Existing task and human edits')
+
+    def test_sequence_ignores_legacy_date_folders(self):
+        tasks = self.root / 'agents/projects/app/tasks'
+        legacy = tasks / '2026-09-29/001-older-task'
+        legacy.mkdir(parents=True)
+        result = vault.task(self.root, 'app', 'Readable name', 'codex')
+        self.assertTrue(Path(result['task_dir']).name.startswith('1-readable-name-'))
+        self.assertTrue(legacy.is_dir())
+
+    def test_unpadded_sequence_continues_across_digit_boundaries(self):
+        tasks = self.root / 'agents/projects/app/tasks'
+        tasks.mkdir(parents=True)
+        for number, expected in [(9, 10), (9999, 10000)]:
+            (tasks / f'{number}-earlier-task-2026-09-28').mkdir()
+            result = vault.task(self.root, 'app', 'Next task', 'codex')
+            name = Path(result['task_dir']).name
+            self.assertTrue(name.startswith(f'{expected}-next-task-'))
+            self.assertFalse(name.startswith('0'))
+
+    def test_sequence_lock_rejects_symlink(self):
+        day = self.root / 'day'
+        day.mkdir(parents=True)
+        outside = Path(self.temp.name) / 'unrelated-note'
+        outside.write_text('Preserve me')
+        (day / '.sequence.lock').symlink_to(outside)
+        with self.assertRaises(OSError):
+            vault.reserve_task(day, 'new-task')
+        self.assertEqual(outside.read_text(), 'Preserve me')
 
     def test_invalid_project_rejected_before_writes(self):
         for project in ('../escape', '/absolute', 'a/b', '..', 'with space'):

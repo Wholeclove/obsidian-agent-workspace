@@ -1,6 +1,6 @@
 # Workspace helper
 
-The helper requires Python 3.10+ and has no third-party dependencies. After cloning
+The helper requires Python 3.10+ on macOS or Linux and has no third-party dependencies. After cloning
 the repository, run these commands from its root. Installed skills resolve the
 helper relative to the plugin, so agents do not need a separate checkout.
 
@@ -15,7 +15,7 @@ python3 plugins/obsidian-workspace/scripts/vault.py context
 | Command | Result |
 | --- | --- |
 | `init` | Creates `agents/home.md`, `agents/guide.md`, and `agents/projects/`; prints the workspace path. Existing notes are preserved. |
-| `task` | Creates a unique task, subfolders, README, and handoff; prints JSON paths. Also initializes the workspace if needed. |
+| `task` | Creates a unique task, subfolders, README, decision log, and handoff; prints JSON paths. Also initializes the workspace if needed. |
 | `context` | Prints the resolved vault path, helper path, and policy. Does not write files. |
 
 Select a custom vault by passing `--vault` **before** the command:
@@ -33,13 +33,17 @@ precedence over `~/Documents/obsidian-vault`. Paths must be absolute after expan
 Projects use lowercase ASCII letters, digits, and hyphens. Choose a stable project
 slug across worktrees, and distinguish repositories with the same basename. Task
 titles need at least one ASCII letter or digit; titles retain their original text
-in metadata, while folder names use a normalized slug, UTC timestamp, and random
-suffix. `--owner` is optional and defaults to `unassigned`.
+in metadata. New task folders start with a sequence without leading zeros, then the title,
+then the UTC date: `tasks/1-investigate-retry-failures-2026-09-29/`. Numbers
+increase across the entire project, including across days, so numeric (natural) name sorting keeps
+sessions in creation order. Full UTC timestamps remain in README metadata. A hidden
+`tasks/.sequence.lock` file coordinates concurrent creators on macOS/Linux. Existing folders are never renamed by the helper. `--owner` is optional and defaults to `unassigned`.
 
 The task command's JSON includes:
 
 - `task_dir`: absolute task directory.
 - `index`: absolute task README path.
+- `decisions`: absolute path to the task decision log.
 - `vault_relative_index`: path to that README from the vault root.
 - `obsidian_uri`: encoded URI for opening the README in Obsidian.
 - `tmpdir`: directory for command-scoped temporary files.

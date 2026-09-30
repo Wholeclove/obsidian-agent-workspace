@@ -14,13 +14,13 @@ and dependency-free Python helper create the workspace and task folders.
 ## Requirements
 
 - Claude Code or Codex with access to your filesystem.
-- Python 3.10 or later for the optional helper, available as `python3`.
+- Python 3.10 or later on macOS or Linux for the optional helper, available as `python3`.
 - Plugin support only if you choose to install the optional plugin.
 - A local directory for the vault, writable by your agent.
 - Obsidian is optional for agents and useful for browsing the files yourself.
 
-Examples use a POSIX shell on macOS or Linux. These platforms are covered by CI;
-Windows client integration has not been verified.
+Examples use a POSIX shell on macOS or Linux. These platforms are covered by CI.
+The helper uses POSIX file locking; Windows is not supported by the helper.
 
 ## Add the guidance
 
@@ -40,6 +40,10 @@ works. There are no startup hooks or per-write checks running in the background.
 Installing the optional plugin does **not** install these persistent instructions.
 The guidance is usable on its own; an agent can create the documented layout with
 its normal filesystem tools.
+
+See [where agents put files](docs/file-placement.md) for the instruction sources,
+file destinations, and how agents share context across repository worktrees.
+This repository's `AGENTS.md` and `CLAUDE.md` point to the same guidance.
 
 ## Optional plugin
 
@@ -84,8 +88,9 @@ obsidian-vault/
         └── billing-api/
             ├── index.md
             └── tasks/
-                └── 20260925T160000Z-investigate-retry-failures-a1b2c3d4/
+                └── 1-investigate-retry-failures-2026-09-29/
                     ├── README.md
+                    ├── decisions.md
                     ├── scratch/
                     ├── tmp/
                     ├── research/
@@ -94,8 +99,13 @@ obsidian-vault/
                     └── handoffs/latest.md
 ```
 
+Task names start with a short project sequence, followed by the readable title and
+UTC date. Numbers increase across days. Use numeric (natural) name sorting for chronological order. Full
+timestamps stay in README metadata. Existing task paths are preserved.
+
 The task README links to relevant files and records the objective, status, owner,
-and working context. The handoff captures decisions, verification, and next steps.
+and working context. The decision log records choices, rationale, alternatives, and consequences.
+The handoff links to that log and captures current constraints, verification, and next steps.
 Resume a task from its README instead of creating a new folder for each session.
 Completed tasks stay at stable paths; nothing is automatically deleted.
 
@@ -121,12 +131,48 @@ Desktop applications may not inherit your shell environment. Put the path in you
 agent's persistent instructions when needed. Generated folder names have no spaces;
 custom vault paths containing spaces are supported.
 
-Grant the vault write access using your client's workspace controls. For Codex CLI,
-create the vault directory first, then launch with:
+### Give repository agents vault access
+
+Persistent instructions choose destinations; filesystem settings provide access.
+Create the vault directory before adding it to either client. Use the same absolute
+path in access settings as in your instructions, including when starting in a
+separate Git worktree. Keep machine-specific absolute paths in personal settings.
+
+For **Codex**, merge the vault into `~/.codex/config.toml`:
+
+```toml
+[sandbox_workspace_write]
+writable_roots = ["/absolute/path/to/obsidian-vault"]
+```
+
+Preserve existing entries and avoid duplicate TOML tables. This setting applies to
+`workspace-write` sessions. For one CLI session, use:
 
 ```sh
 codex --add-dir "${OBSIDIAN_AGENT_VAULT:-$HOME/Documents/obsidian-vault}"
 ```
+
+See the official [Codex configuration reference](https://developers.openai.com/codex/config-reference).
+
+For **Claude Code**, merge the vault into `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "additionalDirectories": ["/absolute/path/to/obsidian-vault"]
+  }
+}
+```
+
+Preserve other permission settings and existing directories. For one CLI session,
+use `claude --add-dir "/absolute/path/to/obsidian-vault"`. The directory follows the
+session's normal edit permissions; see [Claude Code working directories](https://code.claude.com/docs/en/permissions#working-directories).
+
+Start a new session after changing global instructions or access settings. In a
+managed desktop session, check its effective workspace permissions too: host policy
+can restrict access beyond these settings. Verify access from each client and from
+a task worktree using [the walkthrough](docs/walkthrough.md). An inaccessible vault
+needs a path or permission fix; a repository symlink does not grant access.
 
 ## Scope
 

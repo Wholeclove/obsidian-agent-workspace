@@ -11,3 +11,12 @@ Run `python3 -m unittest discover -s tests -v` after changing the helper. Never 
 real user vault or overwrite client settings during tests. The helper must preserve
 existing notes, support paths with spaces, reject traversal, and resolve the default
 vault consistently when no override is configured. Keep client-specific install details in README.md.
+
+## Agent working files
+
+Before creating plans, worktree notes, reports, temporary scripts, or other working
+files, read and follow [the standalone guidance](docs/agent-guidance.md).
+Use project slug `obsidian-agent-workspace` across this repository's worktrees.
+The [file placement guide](docs/file-placement.md) explains the instruction sources,
+default destinations, and access requirements. Keep project deliverables in the
+task worktree and give continuing agents the absolute vault task README path.

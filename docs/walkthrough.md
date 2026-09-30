@@ -14,7 +14,15 @@
 6. Start a fresh session in the other client and provide the task's absolute README
    path. Ask it to continue from the handoff. Confirm it reads and updates the existing
    task rather than creating an unrelated folder.
-7. Mark the task complete. Confirm no automatic cleanup moves or deletes its files.
+7. Start a fresh session in a task worktree. Confirm it can read the same task
+   README and write a task note under the configured permissions. Ask it for a plan,
+   worktree note, and review report; expect `scratch/plan.md`,
+   `scratch/worktree-notes.md`, and `artifacts/` respectively, linked from the README.
+   Check that a reusable source script still goes in the repository worktree.
+   Ask the agent to record a decision and its rationale in `decisions.md`, then
+   change that decision. Confirm it preserves and marks the old entry superseded,
+   links its replacement, and links the log from the README and handoff.
+8. Mark the task complete. Confirm no automatic cleanup moves or deletes its files.
 
 Run `python3 plugins/obsidian-workspace/scripts/vault.py context` without a vault
 override: it must report `~/Documents/obsidian-vault` expanded to your home directory
