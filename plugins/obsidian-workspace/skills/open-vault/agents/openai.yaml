@@ -1,0 +1,4 @@
+interface:
+  display_name: "Open Session Vault"
+  short_description: "Open the current task and vault in Obsidian"
+  default_prompt: "Use $open-vault to open this session's vault in Obsidian."

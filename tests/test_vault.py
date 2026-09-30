@@ -175,7 +175,10 @@ class RepositoryVaultTests(unittest.TestCase):
         self.repo.mkdir()
         env = {k: v for k, v in os.environ.items()
                if not k.startswith(('OBSIDIAN_AGENT_', 'GIT_'))}
-        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1')
+        # The task's temporary directory may itself live inside a repository vault.
+        # Do not let an "outside Git" fixture discover that enclosing repository.
+        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1',
+                   GIT_CEILING_DIRECTORIES=str(self.base.parent))
         self.env = patch.dict(os.environ, env, clear=True)
         self.env.start()
         self.addCleanup(self.env.stop)

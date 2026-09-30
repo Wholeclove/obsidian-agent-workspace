@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add `open-vault` to open the current task’s existing vault or the configured
+  home note. Check registration, target exact vault IDs, and provide the vault
+  picker for unregistered folders without editing Obsidian settings.
+
+## 0.5.0
+
 - Load shared guidance automatically through SessionStart and SubagentStart hooks
   for Claude Code and Codex. Codex users must review and trust the hooks.
 - Default new tasks to an ignored `.agent-vault/` in the primary checkout, shared

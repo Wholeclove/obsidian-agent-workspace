@@ -28,7 +28,7 @@ The helper uses POSIX file locking; Windows is not supported by the helper.
 
 No manual guidance copy is needed. The plugin loads its shared policy at session
 start, resume, and after compaction, and supplies it to new subagents. The bundled
-skill and helper are available for setup and task creation.
+skills and helper support setup, task creation, and opening the current vault.
 
 **Claude Code** — run inside a session:
 
@@ -80,6 +80,21 @@ the old copied vault guidance. Preserve unrelated rules and intentional override
 See [where agents put files](docs/file-placement.md) for the instruction sources,
 destinations, and worktree handoffs. This repository’s `AGENTS.md` and `CLAUDE.md`
 point to the standalone guidance for agents developing the package.
+
+## Open the current session vault
+
+Ask “open this session’s vault,” or invoke:
+
+- **Claude Code:** `/obsidian-workspace:open-vault`
+- **Codex:** `$open-vault`
+
+The skill opens the active task’s README in its existing vault, including an older
+shared vault. With no active task, it opens the configured vault’s home note.
+It uses the exact registered vault ID, so repository vaults with the same folder
+name do not get confused. If registration is missing or cannot be checked, it
+opens the vault picker and provides the folder to select with **Open folder as
+vault**. It does not edit Obsidian’s registry or create task files. A successful
+launch request does not verify the desktop window. See [Obsidian setup](docs/obsidian-setup.md).
 
 ## First task
 

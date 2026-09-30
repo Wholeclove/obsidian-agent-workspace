@@ -80,3 +80,25 @@ Filesystem or input errors produce a message on stderr and a nonzero exit code.
 For an invalid vault setting, `context` prints a diagnostic for the model to
 explain the configuration problem. It never selects a
 fallback in place of an invalid explicit path.
+
+## Open a vault in Obsidian
+
+The `open-vault` skill uses a separate helper from the installed plugin:
+
+```sh
+python3 plugins/obsidian-workspace/scripts/open_vault.py --task "/absolute/task/README.md"
+python3 plugins/obsidian-workspace/scripts/open_vault.py --dry-run
+```
+
+`--task` selects the current task’s original vault ahead of environment/scope
+defaults. For custom older layouts, pass its absolute `--vault` too. Without a
+task, `--vault`, `--scope`, and environment/repository settings resolve as above.
+The target is the task README, then the home note, then the vault itself.
+
+The helper reads the desktop `obsidian.json` registry on macOS or Linux; Linux
+respects `XDG_CONFIG_HOME`. For another profile, pass `--registry` with its absolute
+registry path. Exact vault paths map to registered IDs. Missing, inaccessible, or
+unrecognized registration uses `obsidian://choose-vault` and returns instructions
+for registering the folder. `--dry-run` prints JSON without launching anything.
+The helper does not write notes or app configuration, and a missing vault is an
+error. Its `launch_requested` result acknowledges the OS request, not GUI success.

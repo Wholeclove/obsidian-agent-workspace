@@ -1,5 +1,12 @@
 # Open scratch files in Obsidian
 
+Use the plugin’s `open-vault` skill to open the current task automatically. It
+checks desktop registration first. A directory containing notes is not necessarily
+a registered Obsidian vault; an unregistered vault needs the one-time picker step
+below. The skill provides the exact path and preserves existing app settings.
+See [Obsidian URI actions](https://obsidian.md/help/Extending%2BObsidian/Obsidian%2BURI)
+for the underlying open and vault-picker requests.
+
 1. In Obsidian's vault picker, choose **Open folder as vault**, then select the same
    `<primary-checkout>/.agent-vault/` (or the global/custom vault you configured).
    Use the helper’s `path` command to find it. The folder is hidden in many file

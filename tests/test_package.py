@@ -58,6 +58,18 @@ class PackageTests(unittest.TestCase):
             index = Path(json.loads(created.stdout)['index'])
             self.assertTrue(index.is_file())
             self.assertTrue(index.is_relative_to(root / 'test-vault'))
+            registry = root / 'obsidian.json'
+            registry.write_text(json.dumps({'vaults': {'installed-test': {'path': str(root / 'test-vault')}}}))
+            opened = subprocess.run(
+                ['python3', str(installed / 'scripts/open_vault.py'), '--task', str(index),
+                 '--registry', str(registry), '--dry-run'], cwd=root, env=env,
+                capture_output=True, text=True, check=True,
+            )
+            request = json.loads(opened.stdout)
+            self.assertEqual(request['target'], str(index))
+            self.assertEqual(request['registration'], 'registered')
+            self.assertFalse(request['launch_requested'])
+            self.assertTrue((installed / 'skills/open-vault/SKILL.md').is_file())
 
     def test_relative_documentation_links_resolve(self):
         paths = [*REPO.glob('*.md'), *REPO.joinpath('docs').glob('*.md'),
